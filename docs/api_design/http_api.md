@@ -162,7 +162,7 @@ Authorization: Bearer <access_token>
 
 ## Get User Latest Topics
 
-GET: `/chat/topics`
+GET: `/chat/topics?size=<size>&start_index=<start_index>`
 
 This API is used for fetching user latest topics sorted from latest updated topic to the oldest one.
 
@@ -183,7 +183,7 @@ Authorization: Bearer <access_token>
 GET /chat/topics?size=10&start_index=5
 ```
 
-This request will fetch up to `10` next least updated topics starting from topic with index `5` from the overall topics in database.
+This request will fetch up to `10` next least updated topics starting from topic with index `5` from the overall topics exist in database.
 
 **Responses:**
 
@@ -206,7 +206,6 @@ This request will fetch up to `10` next least updated topics starting from topic
                         "content": "Hello World!"
                     },
                     "last_read": {
-                        "1": 1536394340438,
                         "2": 1536394351994
                     },
                     "updated_at": "2019-06-23T12:06:51.028Z",
@@ -221,9 +220,9 @@ This request will fetch up to `10` next least updated topics starting from topic
                         "sender_name": "riandyrn",
                         "type": "text/plain",
                         "content": "Hello Guys!",
+                        "unread_by": [2, 3]
                     },
                     "last_read": {
-                        "1": 1536394352345,
                         "2": 1536394350000,
                         "3": 1536394350000
                     },
@@ -268,13 +267,45 @@ This request will fetch up to `10` next least updated topics starting from topic
 
 POST: `/chat/topics/{topic_id}/messages`
 
+This API is used for publishing message to topic.
+
+All participants which currently online (opening websocket connection to server) will receive the message packet including sender websocket session. The rationale behind this is because sender may have more than one client active at the same time (e.g using both web & app client at the same time). For more details about this behavior, please check out `docs/ws_api.md` document.
+
+Notice that when this API is successfully called, it doesn't guarantee the message has been processed by server, it just mark the message has been successfully delivered to server to be processed by it later.
+
+Message is guaranteed to be processed by server when client also receive the echo of the message through websocket or the message has been appeared on the result of [Get User Latest Topics](#get-user-latest-topics). This is similar to the [Facebook's message delivery confirmation mechanism](https://www.facebook.com/help/messenger-app/iphone/926389207386625/).
+
 [Back to Top](#http-api)
 
 ---
 
 ## Get Latest Messages
 
-GET: `/chat/topics/{topic_id}/messages`
+GET: `/chat/topics/{topic_id}/messages?size=<size>&start_index=<start_index>`
+
+This API is used to fetch user latest messages started from the latest one but the order is reversed in every fetch of messages. So for example we have following messages in database:
+
+* `msg_0` (this is the oldest message)
+* `msg_1`
+* `msg_2`
+* ...
+* `msg_9` (this is the latest message)
+
+For example we want to fetch max `5` messages in every fetch operation. So in first operation we would get:
+
+* `msg_5`
+* `msg_6`
+* ...
+* `msg_9`
+
+In the second operation we would get:
+
+* `msg_0`
+* `msg_1`
+* ...
+* `msg_4`
+
+To put it simply this behavior is similar to behavior of common messenger we know today (Whatsapp, Facebook Messenger, etc) when loading the messages in topic.
 
 [Back to Top](#http-api)
 
@@ -283,6 +314,8 @@ GET: `/chat/topics/{topic_id}/messages`
 ## Confirm Reads
 
 PUT: `/chat/topics/{topic_id}/reads/{user_id}`
+
+This API is used for submitting `seq_id` of last message being read in the topic. All participants which currently online excluding sender will receive the read packet.
 
 [Back to Top](#http-api)
 
