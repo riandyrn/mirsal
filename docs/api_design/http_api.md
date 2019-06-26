@@ -166,6 +166,10 @@ GET: `/chat/topics?size=<size>&start_index=<start_index>`
 
 This API is used for fetching user latest topics sorted from latest updated topic to the oldest one.
 
+// TODO: tambahkan penjelasan mengenai `last_read` & `unread_by`.
+
+// TODO: tambahkan is owner / is admin parameter di result + penjelasannya --> tambahkan jg parameter untuk ngecek apakah ada admin selain owner atau gimana --> list mungkin ya?
+
 **Header:**
 
 ```bash
@@ -220,7 +224,7 @@ This request will fetch up to `10` next least updated topics starting from topic
                         "sender_name": "riandyrn",
                         "type": "text/plain",
                         "content": "Hello Guys!",
-                        "unread_by": [2, 3]
+                        "is_read": true
                     },
                     "last_read": {
                         "2": 1536394350000,
@@ -269,11 +273,11 @@ POST: `/chat/topics/{topic_id}/messages`
 
 This API is used for publishing message to topic.
 
-All participants which currently online (opening websocket connection to server) will receive the message packet including sender websocket session. The rationale behind this is because sender may have more than one client active at the same time (e.g using both web & app client at the same time). For more details about this behavior, please check out `docs/ws_api.md` document.
+All participants which currently online (opening websocket connection to server) will receive the message packet including sender websocket session. The rationale behind this is because sender may have more than one client active at the same time (e.g using both web & app client at the same time). For more details about this behavior, please check out `docs/api_design/ws_api.md` document.
 
 Notice that when this API is successfully called, it doesn't guarantee the message has been processed by server, it just mark the message has been successfully delivered to server to be processed by it later.
 
-Message is guaranteed to be processed by server when client also receive the echo of the message through websocket or the message has been appeared on the result of [Get User Latest Topics](#get-user-latest-topics). This is similar to the [Facebook's message delivery confirmation mechanism](https://www.facebook.com/help/messenger-app/iphone/926389207386625/).
+Message is guaranteed to be processed by server when client already receive the message packet echo through the websocket session or the message has been appeared on the result of [Get User Latest Topics](#get-user-latest-topics). This is similar to the [Facebook's message delivery confirmation mechanism](https://www.facebook.com/help/messenger-app/iphone/926389207386625/).
 
 [Back to Top](#http-api)
 
@@ -305,7 +309,7 @@ In the second operation we would get:
 * ...
 * `msg_4`
 
-To put it simply this behavior is similar to behavior of common messenger we know today (Whatsapp, Facebook Messenger, etc) when loading the messages in topic.
+To put it simply this behavior is similar to behavior of common messengers we know today (Whatsapp, Facebook Messenger, etc) when loading messages in the topic.
 
 [Back to Top](#http-api)
 
@@ -315,7 +319,7 @@ To put it simply this behavior is similar to behavior of common messenger we kno
 
 PUT: `/chat/topics/{topic_id}/reads/{user_id}`
 
-This API is used for submitting `seq_id` of last message being read in the topic. All participants which currently online excluding sender will receive the read packet.
+This API is used for submitting `seq_id` of last message being read in the topic. All participants which currently online except sender will receive the read packet (this behavior is different with message packet in which sender also receive the packet).
 
 [Back to Top](#http-api)
 
@@ -323,7 +327,26 @@ This API is used for submitting `seq_id` of last message being read in the topic
 
 ## Delete Topic
 
-DELETE: `/chat/topics/{topic_id}`
+DELETE: `/chat/topics/{topic_id}?delete=true`
+
+This API is used to make either `p2p` or `group` topic disappear from the result of [Get User Latest Topics](#get-user-latest-topics). Underneath though, `p2p` & `group` topics are being treated differently.
+
+When this function is being called on `p2p` topic, it would not remove the topic entry from database, only hide it. The reason behind this behavior is because we want to make it possible for peer to still contact the user after user deleting the topic because essentially what user did is relatively delete the topic only for himself. So it would be very weird from peer perspective if all of sudden he cannot send the message to user just because user delete the topic from his side (e.g to clear up his storage). This behavior is actually the same behavior like Whatsapp.
+
+When this function is being called on `group` topic, there are 2 possible actions which could be done:
+
+1. Literally deleting the topic, in which means all of the current members would be kicked out
+2. Leave the topic
+
+The first action would only be possible to be done by topic `owner`. As for the second action it could be done by every member in the topic.
+
+When `owner` leaving the topic, one of topic `admin` would be randomly selected as the new `owner`, when there is no `admin` in the topic, the request for `owner` to leave the topic would be rejected (he need to explicitly execute the first action). Client could check whether there is admin in the topic by looking at the result of [Get User Latest Topics](#get-user-latest-topics).
+
+To literally delete the topic (first action), client need to specify `delete=true` on query parameters, otherwise it would be leaving the topic.
+
+Client could recognize whether user is `owner` or `admin` or normal user on the `group` topic by looking at the result of [Get User Latest Topics](#get-user-latest-topics). Notice that this structure of authorization only exist on `group` topic.
+
+When a user is being promoted to `admin` or `owner`, all online members on the topic would be notified. Please check out `docs/api_design/ws_api.md` for details.
 
 [Back to Top](#http-api)
 
@@ -333,6 +356,8 @@ DELETE: `/chat/topics/{topic_id}`
 
 GET: `/chat/topics/{topic_id}/users`
 
+This API is used for getting current members of the `group` topic along with their authorization level.
+
 [Back to Top](#http-api)
 
 ---
@@ -340,6 +365,8 @@ GET: `/chat/topics/{topic_id}/users`
 ## Add User to Topic
 
 POST: `/chat/topics/{topic_id}/users`
+
+This API is used by `admin` to add member to `group` topic.
 
 [Back to Top](#http-api)
 
@@ -349,6 +376,8 @@ POST: `/chat/topics/{topic_id}/users`
 
 DELETE: `/chat/topics/{topic_id}/users/{user_id}`
 
+This API is used by `admin` to evict member from `group` topic.
+
 [Back to Top](#http-api)
 
 ---
@@ -357,6 +386,12 @@ DELETE: `/chat/topics/{topic_id}/users/{user_id}`
 
 PATCH: `/chat/topics/{topic_id}/users/{user_id}`
 
+This API is used by `admin` to promote a member into `admin` in `group` topic.
+
+An `admin` may add or remove member from the topic.
+
+When member promotion is successful, all online members will receive the notification packet via websocket session. For more details please check `docs/api_design/ws_api.md`.
+
 [Back to Top](#http-api)
 
 ---
@@ -364,6 +399,10 @@ PATCH: `/chat/topics/{topic_id}/users/{user_id}`
 ## Demote as Admin
 
 PATCH: `/chat/topics/{topic_id}/users/{user_id}`
+
+This API is used by `admin` to demote another admin into normal user in `group` topic.
+
+When admin demotion is successful, all online members will be notified via websocket session. For more details please check `docs/api_design/ws_api.md`.
 
 [Back to Top](#http-api)
 
