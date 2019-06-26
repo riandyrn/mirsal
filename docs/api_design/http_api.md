@@ -20,6 +20,10 @@ List of APIs specified in this document:
 * [`Promote as Admin`](#promote-as-admin)
 * [`Demote Admin`](#demote-admin)
 
+Beside above specified APIs, developers need to be aware about following aspects as well:
+
+* [`Common Errors`](#common-errors)
+
 ---
 
 ## User Login
@@ -300,7 +304,7 @@ POST: `/chat/topics/{topic_id}/messages`
 
 This API is used for publishing message to topic.
 
-All participants which currently online (opening websocket connection to server) will receive the message packet including sender websocket session. The rationale behind this is because sender may have more than one client active at the same time (e.g using both web & app client at the same time). For more details about this behavior, please check out `docs/api_design/ws_api.md` document.
+All participants which currently online (opening websocket connection to server) will receive the message packet including sender websocket session. The rationale behind this is because sender may have more than one client active at the same time (e.g using both web & app client at the same time). For more details about this behavior, please check out `docs/api_design/ws_api.md`.
 
 Notice that when this API is successfully called, it doesn't guarantee the message has been processed by server, it just mark the message has been successfully delivered to server to be processed by it later.
 
@@ -352,7 +356,7 @@ Authorization: Bearer <access_token>
     ```json
     {
         "status": 404,
-        "err": "ERR_NOT_FOUND",
+        "err": "ERR_TOPIC_NOT_FOUND",
         "ts": "2018-09-08T08:12:31.994Z"
     }
     ```
@@ -466,6 +470,18 @@ GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
 
     Client will receive this error when provided `last_key` value is invalid. Make sure to use value which provided by previous API response.
 
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to get messages from topic which not exist to user (user doesn't have subscription towards the topic).
+
 [Back to Top](#http-api)
 
 ---
@@ -508,6 +524,18 @@ Authorization: Bearer <access_token>
     }
     ```
 
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to confirm last read to topic which not exist to user (user doesn't have subscription towards the topic).
+
 [Back to Top](#http-api)
 
 ---
@@ -520,7 +548,7 @@ This API is used to make either `p2p` or `group` topic disappear from the result
 
 When this function is being called on `p2p` topic, it would not remove user subscription to the topic, only hide it. The reason behind this behavior is because we want to make it possible for peer to still contact the user after user deleting the topic because essentially what user did is relatively delete the topic only for himself. So it would be very weird from peer perspective if all of sudden peer cannot send the message to user just because user delete the topic (e.g to clear up his storage). This behavior is actually the same behavior like Whatsapp.
 
-When this function is being called on `group` topic, user subscription would be literally deleted from database. So user would no longer be able to receive any notification from the topic nor send message to the topic.
+When this function is being called on `group` topic, user subscription would be literally deleted from database. So user would no longer be able to receive any notification from the topic nor send message to the topic. This behavior is equivalent with leaving the topic.
 
 **Header:**
 
@@ -542,6 +570,18 @@ Authorization: Bearer <access_token>
         "ts": "2019-06-23T12:06:51.028Z"
     }
     ```
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to delete topic which not exist to user (user doesn't have subscription towards the topic).
 
 [Back to Top](#http-api)
 
@@ -591,6 +631,18 @@ Authorization: Bearer <access_token>
     }
     ```
 
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to get member list from topic which not exist to user (user doesn't have subscription towards the topic).
+
 [Back to Top](#http-api)
 
 ---
@@ -633,6 +685,42 @@ Authorization: Bearer <access_token>
     }
     ```
 
+* Missing `target_id` (`400 Bad Request`):
+
+    ```json
+    {
+        "status": 400,
+        "err": "ERR_MISSING_BAD_REQUEST",
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error if it doesn't include `target_id` in parameter.
+
+* Insufficient Permission (`403 Forbidden Access`):
+
+    ```json
+    {
+        "status": 403,
+        "err": "ERR_INSUFFICIENT_PERMISSION",
+         "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error if non-admin user trying to execute this API.
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to execute this API on the topic which not exist to user (user doesn't have subscription towards the topic).
+
 [Back to Top](#http-api)
 
 ---
@@ -667,6 +755,43 @@ Authorization: Bearer <access_token>
     }
     ```
 
+* Insufficient Permission (`403 Forbidden Access`):
+
+    ```json
+    {
+        "status": 403,
+        "err": "ERR_INSUFFICIENT_PERMISSION",
+         "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error if non-admin user trying to execute this API.
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to execute this API on the topic which not exist to user (user doesn't have subscription towards the topic).
+
+* User Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_USER_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to remove user which not member of the topic.
+
+
 [Back to Top](#http-api)
 
 ---
@@ -680,6 +805,8 @@ This API is used by `admin` to promote a member into new `admin` in `group` topi
 An `admin` may add or remove member from the topic.
 
 When member promotion is successful, all online members will receive the notification packet via websocket session. For more details please check `docs/api_design/ws_api.md`.
+
+When this API being called upon `admin` user, the effect is idempotent.
 
 **Header:**
 
@@ -711,6 +838,54 @@ Authorization: Bearer <access_token>
         "ts": "2019-06-23T12:06:51.028Z"
     }
     ```
+
+* Missing `what` (`400 Bad Request`):
+
+    ```json
+    {
+        "status": 400,
+        "err": "ERR_MISSING_WHAT",
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error when `what` is omitted from request body.
+
+* Insufficient Permission (`403 Forbidden Access`):
+
+    ```json
+    {
+        "status": 403,
+        "err": "ERR_INSUFFICIENT_PERMISSION",
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error if non-admin user trying to execute this API.
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to execute this API on the topic which not exist to user (user doesn't have subscription towards the topic).
+
+* User Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_USER_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to promote user which not member of the topic.
 
 [Back to Top](#http-api)
 
@@ -754,6 +929,98 @@ Authorization: Bearer <access_token>
         "ts": "2019-06-23T12:06:51.028Z"
     }
     ```
+
+* Insufficient Permission (`403 Forbidden Access`):
+
+    ```json
+    {
+        "status": 403,
+        "err": "ERR_INSUFFICIENT_PERMISSION",
+         "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error if non-admin user trying to execute this API.
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_TOPIC_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to execute this API on the topic which not exist to user (user doesn't have subscription towards the topic).
+
+* User Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_USER_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to remove user which not member of the topic.
+
+* User Not Admin (`409 Conflict`)
+
+    ```json
+    {
+        "status": 409,
+        "err": "ERR_USER_NOT_ADMIN",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to demote user which not admin of the topic.
+
+[Back to Top](#http-api)
+
+---
+
+## Common Errors
+
+The errors listed here is common error which may occurred on all APIs listed above.
+
+* Generic Bad Request (`400 Bad Request`):
+
+     ```json
+    {
+        "status": 400,
+        "err": "ERR_BAD_REQUEST",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if for some undisclosed reason server categorize client request as bad request (e.g malicious client trying to exhaust the server).
+
+* Invalid Access Token (`401 Unauthorized`):
+
+    ```json
+    {
+        "status": 401,
+        "err": "ERR_INVALID_ACCESS_TOKEN",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error when it provides invalid `access_token` to resources which needed it as authentication. Empty `access_token` also recognized as invalid `access_token`.
+
+* Server Internal Error (`500 Internal Error`):
+
+    ```json
+    {
+        "status": 500,
+        "err": "ERR_INTERNAL_ERROR",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error when internal error occurred on server while processing the request. This error should be temporary.
 
 [Back to Top](#http-api)
 
