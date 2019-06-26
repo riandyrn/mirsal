@@ -89,7 +89,6 @@ Authorization: Bearer <refresh_token>
 
     Client will receive this error when provided `refresh_token` is invalid. When client receive this error, client should redirect user to login page.
 
-
 [Back to Top](#http-api)
 
 ---
@@ -287,6 +286,12 @@ Notice that when this API is successfully called, it doesn't guarantee the messa
 
 Message is guaranteed to be processed by server when client already receive the message packet echo through the websocket session or the message has been appeared on the result of [Get User Latest Topics](#get-user-latest-topics). This is similar to the [Facebook's message delivery confirmation mechanism](https://www.facebook.com/help/messenger-app/iphone/926389207386625/).
 
+**Header:**
+
+**Body:**
+
+**Responses:**
+
 [Back to Top](#http-api)
 
 ---
@@ -345,11 +350,26 @@ GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
         "status": 200,
         "data": {
             "user_id": 1,
+            "topic_id": "p2p1_2",
             "messages": [
                 {
-                    // TODO
+                    "seq_id": 1536393052771,
+                    "sender_id": 2,
+                    "sender_name": "salim_abdullah",
+                    "type": "text/plain",
+                    "content": "This is slightly older message",
+                    "created_at": "2018-09-08T07:50:52Z.771"
+                },
+                {
+                    "seq_id": 1536394351994,
+                    "sender_id": 2,
+                    "sender_name": "salim_abdullah",
+                    "type": "text/plain",
+                    "content": "This is latest message!",
+                    "created_at": "2018-09-08T08:12:31Z.994"
                 }
-            ]
+            ],
+            "last_key": "cDJwMV8yfDE1MTkwMjMxOTIxMjM"
         },
         "ts": "2019-06-23T12:06:51.028Z"
     }
