@@ -1,5 +1,27 @@
 # HTTP API
 
+This document contains specification for HTTP API.
+
+This document is meant to be used as main reference for both server & client development.
+
+List of APIs specified in this document:
+
+* [`User Login`](#user-login)
+* [`Refresh Access Token`](#refresh-access-token)
+* [`Create Topic`](#create-topic)
+* [`Get User Latest Topics`](#get-user-latest-topics)
+* [`Send Message`](#send-message)
+* [`Get Latest Messages`](#get-latest-messages)
+* [`Confirm Last Read`](#confirm-last-read)
+* [`Delete Topic`](#delete-topic)
+* [`Get Topic Member List`](#get-topic-member-list)
+* [`Add User to Topic`](#add-user-to-topic)
+* [`Remove User from Topic`](#remove-user-from-topic)
+* [`Promote as Admin`](#promote-as-admin)
+* [`Demote Admin`](#demote-admin)
+
+---
+
 ## User Login
 
 POST: `/chat/sessions`
@@ -192,8 +214,6 @@ Authorization: Bearer <access_token>
 GET /chat/topics?size=10&last_key=MXxwMnAxXzJ8MTUxODc2NTUxNTIyMg
 ```
 
-This request will fetch up to `10` next least updated topics starting from topic with index `5` from the overall topics exist in database.
-
 **Responses:**
 
 * Success (`200 OK`):
@@ -288,9 +308,56 @@ Message is guaranteed to be processed by server when client already receive the 
 
 **Header:**
 
+```bash
+Authorization: Bearer <access_token>
+```
+
 **Body:**
 
+* `type` (String): indicate what kind of message being sent, currently the supported value is only `text/plain` which represent simple unicode text.
+* `content` (String): the content of message
+
+```json
+{
+    "type": "text/plain",
+    "content": "Hello World!"
+}
+```
+
 **Responses:**
+
+* Success (`202 Accepted`):
+
+    ```json
+    {
+        "status": 202,
+        "data": {
+            "user_id": 1,
+            "topic_id": "p2p1_2",
+            "message": {
+                "seq_id": 1536394351994,
+                "sender_id": 1,
+                "sender_name": "riandyrn",
+                "type": "text/plain",
+                "content": "Hello World!",
+                "created_at": "2018-09-08T08:12:31.994Z"
+            }
+        },
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+* Topic Not Found (`404 Not Found`)
+
+    ```json
+    {
+        "status": 404,
+        "err": "ERR_NOT_FOUND",
+        "ts": "2018-09-08T08:12:31.994Z"
+    }
+    ```
+
+    Client will receive this error if user trying to send message to topic which not exist to user (user doesn't have subscription towards the topic).
 
 [Back to Top](#http-api)
 
@@ -358,7 +425,7 @@ GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
                     "sender_name": "salim_abdullah",
                     "type": "text/plain",
                     "content": "This is slightly older message",
-                    "created_at": "2018-09-08T07:50:52Z.771"
+                    "created_at": "2018-09-08T07:50:52.771Z"
                 },
                 {
                     "seq_id": 1536394351994,
@@ -366,7 +433,7 @@ GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
                     "sender_name": "salim_abdullah",
                     "type": "text/plain",
                     "content": "This is latest message!",
-                    "created_at": "2018-09-08T08:12:31Z.994"
+                    "created_at": "2018-09-08T08:12:31.994Z"
                 }
             ],
             "last_key": "cDJwMV8yfDE1MTkwMjMxOTIxMjM"
@@ -403,11 +470,43 @@ GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
 
 ---
 
-## Confirm Reads
+## Confirm Last Read
 
 PUT: `/chat/topics/{topic_id}/reads/{user_id}`
 
-This API is used for submitting `seq_id` of last message being read in the topic. All participants which currently online except sender will receive the read packet (this behavior is different with message packet in which sender also receive the packet).
+This API is used for submitting `seq_id` of last message being read in the topic.
+
+All members which currently online will receive the read packet. Please check `docs/api_design/ws_api.md` for more details.
+
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Body:**
+
+```json
+{
+    "last_read": 1536394351994
+}
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "p2p1_2",
+            "last_read": 1536394351994
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
 
 [Back to Top](#http-api)
 
@@ -423,6 +522,27 @@ When this function is being called on `p2p` topic, it would not remove user subs
 
 When this function is being called on `group` topic, user subscription would be literally deleted from database. So user would no longer be able to receive any notification from the topic nor send message to the topic.
 
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "p2p1_2",
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
 [Back to Top](#http-api)
 
 ---
@@ -432,6 +552,44 @@ When this function is being called on `group` topic, user subscription would be 
 GET: `/chat/topics/{topic_id}/users`
 
 This API is used for getting current members of the `group` topic along with their authorization level (either `normal` or `admin` user).
+
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "grp1561294746123",
+            "members": [
+                {
+                    "user_id": 1,
+                    "username": "riandyrn",
+                    "is_admin": true
+                },
+                {
+                    "user_id": 2,
+                    "username": "salim_abdullah",
+                    "is_admin": false
+                },
+                {
+                    "user_id": 3,
+                    "username": "abdullah_zagat",
+                    "is_admin": false
+                }
+            ]
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
 
 [Back to Top](#http-api)
 
@@ -445,17 +603,69 @@ This API is used by `admin` to add member to `group` topic.
 
 When new member is successfully being added to the group, the event would broadcasted to all online members. For more details please check `docs/api_design/ws_api.md`.
 
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Body:**
+
+```json
+{
+    "target_id": 2
+}
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "grp1561294746123",
+            "target_id": 2
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
 [Back to Top](#http-api)
 
 ---
 
 ## Remove User from Topic
 
-DELETE: `/chat/topics/{topic_id}/users/{user_id}`
+DELETE: `/chat/topics/{topic_id}/users/{target_id}`
 
 This API is used by `admin` to remove member from `group` topic.
 
 When member is successfully removed from the group, the event would broadcasted to all online members. For more details please check `docs/api_design/ws_api.md`.
+
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "grp1561294746123",
+            "target_id": 2
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
 
 [Back to Top](#http-api)
 
@@ -463,7 +673,7 @@ When member is successfully removed from the group, the event would broadcasted 
 
 ## Promote as Admin
 
-PATCH: `/chat/topics/{topic_id}/users/{user_id}`
+PATCH: `/chat/topics/{topic_id}/users/{target_id}`
 
 This API is used by `admin` to promote a member into new `admin` in `group` topic.
 
@@ -471,17 +681,79 @@ An `admin` may add or remove member from the topic.
 
 When member promotion is successful, all online members will receive the notification packet via websocket session. For more details please check `docs/api_design/ws_api.md`.
 
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Body:**
+
+```json
+{
+    "what": "promote_admin"
+}
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "grp1561294746123",
+            "what": "promote_admin",
+            "target_id": 2
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
 [Back to Top](#http-api)
 
 ---
 
-## Demote as Admin
+## Demote Admin
 
-PATCH: `/chat/topics/{topic_id}/users/{user_id}`
+PATCH: `/chat/topics/{topic_id}/users/{target_id}`
 
 This API is used by `admin` to demote another admin into normal user in `group` topic.
 
 When admin demotion is successful, all online members will be notified via websocket session. For more details please check `docs/api_design/ws_api.md`.
+
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Body:**
+
+```json
+{
+    "what": "demote_admin"
+}
+```
+
+**Responses:**
+
+* Success (`200 OK`):
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "topic_id": "grp1561294746123",
+            "what": "demote_admin",
+            "target_id": 2
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
 
 [Back to Top](#http-api)
 
