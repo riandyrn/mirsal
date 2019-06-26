@@ -162,13 +162,19 @@ Authorization: Bearer <access_token>
 
 ## Get User Latest Topics
 
-GET: `/chat/topics?size=<size>&start_index=<start_index>`
+GET: `/chat/topics?size=<size>&last_key=<last_key>`
 
-This API is used for fetching user latest topics sorted from latest updated topic to the oldest one.
+This API is used for fetching user latest topics (subscriptions) sorted from latest updated topic to the oldest one. Client could check various information regarding user subscription to the topic from the result of this API.
 
-// TODO: tambahkan penjelasan mengenai `last_read` & `unread_by`.
+In `last_message` object (both in `p2p` & `group` topic), when the last message is being sent by user, there will be extra field called `is_read` which indicate whether that message has been read by all members in the topic or not.
 
-// TODO: tambahkan is owner / is admin parameter di result + penjelasannya --> tambahkan jg parameter untuk ngecek apakah ada admin selain owner atau gimana --> list mungkin ya?
+Object `last_read` is being used to give other members read information. This information is expected to be used when later client called [Get Latest Messages](#get-latest-messages).
+
+Field `unread` is indicating how many messages in the topic which has not been read by user.
+
+In `group` topic, there will be extra field called `is_admin` which represents whether user is an `admin` in that particular topic. This information could be used by client to show commands which only available for `admin` when user loading the topic later.
+
+Field `last_key` is special string which represents last element in the topic iterator which could be used as offset to fetch next topics. This field exists when user potentially has more topics to be fetched.
 
 **Header:**
 
@@ -179,12 +185,12 @@ Authorization: Bearer <access_token>
 **Parameters:**
 
 * `size` (Int): the maximum number of topics being fetched.
-* `start_index` (Int, _optional_): start index of next batch of items to be fetched, the value started from `0`.
+* `last_key` (String, _optional_): special string which represents last element in the topic iterator which could be used as offset to fetch next topics.
 
 **Example Request:**
 
 ```curl
-GET /chat/topics?size=10&start_index=5
+GET /chat/topics?size=10&last_key=MXxwMnAxXzJ8MTUxODc2NTUxNTIyMg
 ```
 
 This request will fetch up to `10` next least updated topics starting from topic with index `5` from the overall topics exist in database.
@@ -231,9 +237,11 @@ This request will fetch up to `10` next least updated topics starting from topic
                         "3": 1536394350000
                     },
                     "updated_at": "2019-06-23T08:07:00.128Z",
-                    "unread": 0
+                    "unread": 0,
+                    "is_admin": true
                 }
-            ]
+            ],
+            "last_key": "MXxwMnAxXzJ8MTUxODc2NTUxNTIyMg",
         },
         "ts": "2019-06-23T12:06:51.028Z"
     }
@@ -251,17 +259,17 @@ This request will fetch up to `10` next least updated topics starting from topic
 
     Client will receive this error when provided `size` value is invalid. By default it should higher than `0` & less or equal than `20`.
 
-* Invalid Start Index (`400 Bad Request`)
+* Invalid Last Key (`400 Bad Request`)
 
     ```json
     {
         "status": 400,
-        "err": "ERR_INVALID_START_INDEX",
+        "err": "ERR_INVALID_LAST_KEY",
         "ts": "2019-06-23T12:06:51.028Z"
     }
     ```
 
-    Client will receive this error when provided `start_index` value is invalid. The value should be greater than `0`.
+    Client will receive this error when provided `last_key` value is invalid. Make sure to use value which provided by previous API response.
 
 [Back to Top](#http-api)
 
@@ -285,7 +293,7 @@ Message is guaranteed to be processed by server when client already receive the 
 
 ## Get Latest Messages
 
-GET: `/chat/topics/{topic_id}/messages?size=<size>&start_index=<start_index>`
+GET: `/chat/topics/{topic_id}/messages?size=<size>&last_key=<last_key>`
 
 This API is used to fetch user latest messages started from the latest one but the order is reversed in every fetch of messages. So for example we have following messages in database:
 
@@ -311,6 +319,66 @@ In the second operation we would get:
 
 To put it simply this behavior is similar to behavior of common messengers we know today (Whatsapp, Facebook Messenger, etc) when loading messages in the topic.
 
+**Header:**
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+**Parameters:**
+
+* `size` (Int): the maximum number of messages being fetched.
+* `last_key` (String, _optional_): special string which represents last element in the message iterator which could be used as offset to fetch next messages.
+
+**Example Request:**
+
+```curl
+GET /chat/topics/p2p1_2/messages?size=10&last_key=cDJwMV8yfDE1MTkwMjMxOTIxMjM
+```
+
+**Responses:**
+
+* Success (`200 OK`)
+
+    ```json
+    {
+        "status": 200,
+        "data": {
+            "user_id": 1,
+            "messages": [
+                {
+                    // TODO
+                }
+            ]
+        },
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+* Invalid Size (`400 Bad Request`)
+
+    ```json
+    {
+        "status": 400,
+        "err": "ERR_INVALID_SIZE",
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error when provided `size` value is invalid. By default it should higher than `0` & less or equal than `20`.
+
+* Invalid Last Key (`400 Bad Request`)
+
+    ```json
+    {
+        "status": 400,
+        "err": "ERR_INVALID_LAST_KEY",
+        "ts": "2019-06-23T12:06:51.028Z"
+    }
+    ```
+
+    Client will receive this error when provided `last_key` value is invalid. Make sure to use value which provided by previous API response.
+
 [Back to Top](#http-api)
 
 ---
@@ -327,26 +395,13 @@ This API is used for submitting `seq_id` of last message being read in the topic
 
 ## Delete Topic
 
-DELETE: `/chat/topics/{topic_id}?delete=true`
+DELETE: `/chat/topics/{topic_id}`
 
 This API is used to make either `p2p` or `group` topic disappear from the result of [Get User Latest Topics](#get-user-latest-topics). Underneath though, `p2p` & `group` topics are being treated differently.
 
-When this function is being called on `p2p` topic, it would not remove the topic entry from database, only hide it. The reason behind this behavior is because we want to make it possible for peer to still contact the user after user deleting the topic because essentially what user did is relatively delete the topic only for himself. So it would be very weird from peer perspective if all of sudden he cannot send the message to user just because user delete the topic from his side (e.g to clear up his storage). This behavior is actually the same behavior like Whatsapp.
+When this function is being called on `p2p` topic, it would not remove user subscription to the topic, only hide it. The reason behind this behavior is because we want to make it possible for peer to still contact the user after user deleting the topic because essentially what user did is relatively delete the topic only for himself. So it would be very weird from peer perspective if all of sudden peer cannot send the message to user just because user delete the topic (e.g to clear up his storage). This behavior is actually the same behavior like Whatsapp.
 
-When this function is being called on `group` topic, there are 2 possible actions which could be done:
-
-1. Literally deleting the topic, in which means all of the current members would be kicked out
-2. Leave the topic
-
-The first action would only be possible to be done by topic `owner`. As for the second action it could be done by every member in the topic.
-
-When `owner` leaving the topic, one of topic `admin` would be randomly selected as the new `owner`, when there is no `admin` in the topic, the request for `owner` to leave the topic would be rejected (he need to explicitly execute the first action). Client could check whether there is admin in the topic by looking at the result of [Get User Latest Topics](#get-user-latest-topics).
-
-To literally delete the topic (first action), client need to specify `delete=true` on query parameters, otherwise it would be leaving the topic.
-
-Client could recognize whether user is `owner` or `admin` or normal user on the `group` topic by looking at the result of [Get User Latest Topics](#get-user-latest-topics). Notice that this structure of authorization only exist on `group` topic.
-
-When a user is being promoted to `admin` or `owner`, all online members on the topic would be notified. Please check out `docs/api_design/ws_api.md` for details.
+When this function is being called on `group` topic, user subscription would be literally deleted from database. So user would no longer be able to receive any notification from the topic nor send message to the topic.
 
 [Back to Top](#http-api)
 
@@ -356,7 +411,7 @@ When a user is being promoted to `admin` or `owner`, all online members on the t
 
 GET: `/chat/topics/{topic_id}/users`
 
-This API is used for getting current members of the `group` topic along with their authorization level.
+This API is used for getting current members of the `group` topic along with their authorization level (either `normal` or `admin` user).
 
 [Back to Top](#http-api)
 
@@ -368,6 +423,8 @@ POST: `/chat/topics/{topic_id}/users`
 
 This API is used by `admin` to add member to `group` topic.
 
+When new member is successfully being added to the group, the event would broadcasted to all online members. For more details please check `docs/api_design/ws_api.md`.
+
 [Back to Top](#http-api)
 
 ---
@@ -376,7 +433,9 @@ This API is used by `admin` to add member to `group` topic.
 
 DELETE: `/chat/topics/{topic_id}/users/{user_id}`
 
-This API is used by `admin` to evict member from `group` topic.
+This API is used by `admin` to remove member from `group` topic.
+
+When member is successfully removed from the group, the event would broadcasted to all online members. For more details please check `docs/api_design/ws_api.md`.
 
 [Back to Top](#http-api)
 
@@ -386,7 +445,7 @@ This API is used by `admin` to evict member from `group` topic.
 
 PATCH: `/chat/topics/{topic_id}/users/{user_id}`
 
-This API is used by `admin` to promote a member into `admin` in `group` topic.
+This API is used by `admin` to promote a member into new `admin` in `group` topic.
 
 An `admin` may add or remove member from the topic.
 
